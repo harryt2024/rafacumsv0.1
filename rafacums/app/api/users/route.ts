@@ -1,7 +1,7 @@
 // app/api/users/route.ts
 import { NextResponse, NextRequest } from 'next/server'; // Import NextRequest
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]/route'; // Adjust path
+import { authOptions } from "@/lib/authOptions";
 import { prisma } from '@/lib/prisma'; // Adjust path
 import bcrypt from 'bcrypt';
 import { UserRole } from '@prisma/client';

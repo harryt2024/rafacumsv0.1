@@ -1,7 +1,7 @@
 // app/api/uniform/route.ts
 import { NextResponse, NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../auth/[...nextauth]/route'; // Adjust path
+import { authOptions } from "@/lib/authOptions";
 import { prisma } from '@/lib/prisma'; // Adjust path
 import { UserRole, ItemType, Condition } from '@prisma/client';
 import { Prisma } from '@prisma/client'; // Import Prisma namespace for types

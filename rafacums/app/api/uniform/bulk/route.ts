@@ -1,7 +1,7 @@
 // app/api/uniform/bulk/route.ts
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route'; // Adjust path
+import { authOptions } from "@/lib/authOptions";
 import { prisma } from '@/lib/prisma'; // Adjust path
 import { UserRole, ItemType, Condition } from '@prisma/client';
 import { Prisma } from '@prisma/client';

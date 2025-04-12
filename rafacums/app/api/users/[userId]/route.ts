@@ -1,45 +1,62 @@
 // app/api/users/[userId]/route.ts
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route'; // Adjust path
-import { prisma } from '@/lib/prisma'; // Adjust path
+// Ensure these paths are correct for YOUR project structure
+import { authOptions } from '@/lib/authOptions';
+import { prisma } from '@/lib/prisma';
 import { UserRole } from '@prisma/client';
 
-interface Params {
-  params: { userId: string };
-}
+// DELETE handler using 'any' for context as a workaround for potential v15 build issue
+export async function DELETE(
+    req: NextRequest,
+    context: any // <-- Applying the 'any' workaround here
+) {
+    const session = await getServerSession(authOptions);
 
-// DELETE handler (ADMIN only)
-export async function DELETE(req: Request, { params }: Params) {
-  const session = await getServerSession(authOptions);
-  const { userId } = params;
+    // IMPORTANT: Need to safely access params now context is 'any'
+    // Use optional chaining (?.) and type assertion/check
+    const userId = context?.params?.userId as string | undefined;
 
-  if (!session || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-  }
-
-   // Prevent admin from deleting themselves? (Optional safety check)
-   if (session.user.id === userId) {
-        return NextResponse.json({ message: 'Cannot delete yourself' }, { status: 400 });
-   }
-
-  if (!userId) {
-    return NextResponse.json({ message: 'User ID not provided' }, { status: 400 });
-  }
-
-  try {
-    await prisma.user.delete({
-      where: { id: userId },
-    });
-    return NextResponse.json({ message: 'User deleted successfully' }, { status: 200 });
-    // Use status 204 (No Content) if you don't want to send a body
-    // return new Response(null, { status: 204 });
-  } catch (error: any) {
-    console.error('Failed to delete user:', error);
-     // Handle case where user doesn't exist (Prisma throws P2025)
-    if (error.code === 'P2025') {
-         return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    // --- Authorization Check ---
+    // Only Admins can delete users
+    // Added safe access session.user?.role
+    if (!session || session.user?.role !== UserRole.ADMIN) {
+        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
-    return NextResponse.json({ message: 'Failed to delete user' }, { status: 500 });
-  }
+    // --- End Authorization Check ---
+
+    // --- Prevent Self-Deletion ---
+    // Added safe access session.user?.id
+    // Ensure session.user exists before comparing IDs
+    if (!session.user || session.user.id === userId) {
+        return NextResponse.json({ message: 'Cannot delete yourself or invalid session' }, { status: 400 });
+    }
+    // --- End Self-Deletion Check ---
+
+    // Check if userId was actually extracted
+    if (!userId) {
+        return NextResponse.json({ message: 'User ID not provided or invalid' }, { status: 400 });
+    }
+
+    try {
+        // Delete the user from the database
+        await prisma.user.delete({
+            where: { id: userId },
+        });
+        // Return 204 No Content for successful DELETE
+        return new Response(null, { status: 204 });
+
+    } catch (error: any) {
+        console.error('Failed to delete user:', error);
+        // Handle specific Prisma error code for record not found
+        if (error.code === 'P2025') {
+             return NextResponse.json({ message: 'User not found' }, { status: 404 });
+        }
+        // Generic error for other database issues
+        return NextResponse.json({ message: 'Failed to delete user' }, { status: 500 });
+    }
 }
+
+// If you add GET/PUT handlers later, apply the 'context: any' signature there too
+// export async function GET(req: NextRequest, context: any) { ... }
+// export async function PUT(req: NextRequest, context: any) { ... }
