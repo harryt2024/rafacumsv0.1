@@ -54,6 +54,9 @@ export const config = {
   matcher: [
     "/admin/:path*",   // Protect all admin routes
     "/dashboard/:path*", // Example: protect dashboard for logged-in users
+    "/uniform",
+    "/uniform/add",
+    "/uniform/bulk-add",
     /* Add other paths that require authentication or specific roles */
     // '/api/users/:path*', // Protect API routes if needed (often handled within route) - careful not to block auth callbacks
   ],

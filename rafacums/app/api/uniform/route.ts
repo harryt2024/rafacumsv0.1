@@ -16,26 +16,20 @@ export async function GET(req: NextRequest) {
 
   // --- Filtering Logic ---
   const { searchParams } = new URL(req.url);
-  const filters: Prisma.UniformItemWhereOutput = {}; // Use Prisma type for where clause
+  const filters: Prisma.UniformItemWhereInput = {}; // Use Prisma type for where clause
 
   // Example filters (add one for each column you want to filter)
-  if (searchParams.get('name')) {
-      filters.name = { contains: searchParams.get('name')!, mode: 'insensitive' }; // Case-insensitive search
-  }
   if (searchParams.get('type') && Object.values(ItemType).includes(searchParams.get('type') as ItemType)) {
       filters.type = searchParams.get('type') as ItemType;
   }
    if (searchParams.get('size')) {
-      filters.size = { contains: searchParams.get('size')!, mode: 'insensitive' };
+      filters.size = { contains: searchParams.get('size')!};
   }
   if (searchParams.get('condition') && Object.values(Condition).includes(searchParams.get('condition') as Condition)) {
       filters.condition = searchParams.get('condition') as Condition;
   }
-   if (searchParams.get('assigneeName')) {
-      filters.assigneeName = { contains: searchParams.get('assigneeName')!, mode: 'insensitive' };
-  }
    if (searchParams.get('location')) {
-      filters.location = { contains: searchParams.get('location')!, mode: 'insensitive' };
+      filters.location = { contains: searchParams.get('location')!};
   }
   // Add more filters for serialNumber, etc. as needed
   // --- End Filtering Logic ---
@@ -69,10 +63,10 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { name, type, size, serialNumber, condition, assigneeName, location, notes } = body;
+    const {type, size, serialNumber, condition, location, notes } = body;
 
     // Basic Validation
-    if (!name || !type || !condition) {
+    if (!type || !condition) {
       return NextResponse.json({ message: 'Missing required fields (name, type, condition)' }, { status: 400 });
     }
     if (!Object.values(ItemType).includes(type as ItemType) || !Object.values(Condition).includes(condition as Condition) ) {
@@ -82,12 +76,10 @@ export async function POST(req: Request) {
 
     const newItem = await prisma.uniformItem.create({
       data: {
-        name,
         type: type as ItemType,
         size: size || null, // Handle optional fields
         serialNumber: serialNumber || null,
         condition: condition as Condition,
-        assigneeName: assigneeName || null,
         location: location || null,
         notes: notes || null,
         addedById: session.user.id, // Track who added it

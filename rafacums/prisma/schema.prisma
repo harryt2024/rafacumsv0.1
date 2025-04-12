@@ -68,12 +68,12 @@ enum UserRole {
 
 model UniformItem {
   id            String      @id @default(cuid())
-  name          String      // e.g., "Wedgewood Shirt", "No 2 SD Jacket", "Beret"
+  // name          String      // e.g., "Wedgewood Shirt", "No 2 SD Jacket", "Beret"
   type          ItemType    // Use an Enum for categories
   size          String?     // e.g., "Medium", "10L", "96cm", "58"
   serialNumber  String?     @unique // Optional, only if items have unique serial numbers
   condition     Condition   @default(GOOD) // Use an Enum for condition
-  assigneeName  String?     // Name/ID of the cadet or staff it's issued to (simple approach)
+  // assigneeName  String?     // Name/ID of the cadet or staff it's issued to (simple approach)
   // assigneeId String?    // Alternatively, link to a User.id if assignees are Users in your system
   // user        User?       @relation(fields: [assigneeId], references: [id]) // Relation if using assigneeId
   location      String?     // e.g., "Main Store", "Cadet Smith", "Rack 5"
@@ -86,22 +86,23 @@ model UniformItem {
 
   @@index([type]) // Add indexes to columns you filter/sort by often
   @@index([condition])
-  @@index([assigneeName])
 }
 
 enum ItemType {
-  SHIRT
-  JACKET
-  TROUSERS
-  BELT
-  BERET
-  HAT_OTHER // Example
-  BOOTS
-  SHOES
+  MENS_WEDGEWOOD_SHIRT
+  MENS_WORKING_BLUES_SHIRT
+  LADIES_WEDGEWOOD_SHIRT
+  LADIES_WORKING_BLUES_SHIRT
+  MENS_TROUSERS
+  LADIES_TROUSERS
   JUMPER
-  TIE
-  RANK_SLIDE
+  GELTEX
+  BERET
+  BLUE_GREY_BELT
   BRASSARD
+  COVERALLS
+  SOCKS
+  GLOVES
   OTHER
 }
 

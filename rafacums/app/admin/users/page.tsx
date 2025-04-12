@@ -1,7 +1,7 @@
 // app/admin/users/page.tsx
-'use client'; // This page needs client-side interactivity
+'use client';
 
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { UserRole } from '@prisma/client'; // Import UserRole enum
 
 // Define a type for the user data we expect from the API
@@ -19,7 +19,14 @@ export default function AdminUserManagement() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state for adding users
+  // --- Filter State ---
+  const [filters, setFilters] = useState({
+      username: '',
+      email: '',
+      role: '', // Empty string means 'All Roles'
+  });
+
+  // --- Add Form state ---
   const [newUsername, setNewUsername] = useState('');
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -28,168 +35,223 @@ export default function AdminUserManagement() {
   const [addError, setAddError] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState<boolean>(false);
 
+  // --- Define some basic styles for the Add User Form ---
+  const inputStyle: React.CSSProperties = {
+      border: '1px solid #ccc',
+      padding: '8px 10px',
+      borderRadius: '4px',
+      // ***** UPDATED FONT SIZE *****
+      fontSize: '0.9rem', // Made font smaller
+      marginLeft: '5px',
+  };
 
-  // Fetch users function
+  const labelStyle: React.CSSProperties = {
+      marginRight: '5px',
+      display: 'inline-block',
+      width: '80px',
+      textAlign: 'right',
+      // ***** ADDED FONT SIZE *****
+      fontSize: '0.9rem', // Make label font size match inputs
+  };
+
+   const buttonStyle: React.CSSProperties = {
+      padding: '10px 15px',
+      border: '1px solid #007bff',
+      backgroundColor: '#007bff',
+      color: 'white',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      // ***** UPDATED FONT SIZE *****
+      fontSize: '0.9rem', // Made font smaller
+      marginLeft: '85px', // Align with inputs based on label width + margin
+      marginTop: '10px',
+  };
+
+   const disabledButtonStyle: React.CSSProperties = {
+       ...buttonStyle, // Inherit base styles (including updated font size)
+       backgroundColor: '#a0cfff',
+       borderColor: '#a0cfff',
+       cursor: 'not-allowed',
+   };
+
+  // --- Fetch users function (updated for filtering) ---
   const fetchUsers = async () => {
     setIsLoading(true);
     setError(null);
+    const queryParams = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+        if (value) { queryParams.append(key, value); }
+    });
+    const queryString = queryParams.toString();
+
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch(`/api/users?${queryString}`);
       if (!response.ok) {
-        throw new Error(`Failed to fetch users: ${response.statusText}`);
+        const errData = await response.json().catch(()=>({}));
+        throw new Error(errData.message || `Failed to fetch users: ${response.statusText}`);
       }
       const data: DisplayUser[] = await response.json();
       setUsers(data);
     } catch (err: any) {
       console.error(err);
       setError(err.message);
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch users on component mount
+  // Fetch users initially and when filters change
   useEffect(() => {
     fetchUsers();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
+
+  // --- Filter Input Handler ---
+  const handleFilterChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const { name, value } = e.target;
+      setFilters(prev => ({ ...prev, [name]: value }));
+  };
 
   // Handle adding a new user
   const handleAddUser = async (e: FormEvent<HTMLFormElement>) => {
      e.preventDefault();
      setIsAdding(true);
      setAddError(null);
-
      try {
         const response = await fetch('/api/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                username: newUsername,
-                password: newPassword,
-                name: newName || undefined, // Send undefined if empty
-                email: newEmail || undefined, // Send undefined if empty
-                role: newRole,
+                username: newUsername, password: newPassword, name: newName || undefined,
+                email: newEmail || undefined, role: newRole,
             }),
         });
-
-         const result = await response.json(); // Read body even for errors
-
-        if (!response.ok) {
-             throw new Error(result.message || `Error: ${response.statusText}`);
-        }
-
-        // Reset form and refresh user list
-        setNewUsername('');
-        setNewPassword('');
-        setNewName('');
-        setNewEmail('');
-        setNewRole(UserRole.USER);
-        await fetchUsers(); // Refresh the list
-
-     } catch (err: any) {
-          console.error("Add user error:", err);
-          setAddError(err.message);
-     } finally {
-         setIsAdding(false);
-     }
+         const result = await response.json();
+        if (!response.ok) { throw new Error(result.message || `Error: ${response.statusText}`); }
+        setNewUsername(''); setNewPassword(''); setNewName(''); setNewEmail(''); setNewRole(UserRole.USER);
+        fetchUsers();
+     } catch (err: any) { setAddError(err.message); } finally { setIsAdding(false); }
   };
 
   // Handle deleting a user
-  const handleDeleteUser = async (userId: string) => {
-     if (!confirm('Are you sure you want to delete this user?')) {
-         return;
-     }
-     setError(null); // Clear previous errors
-
+  const handleDeleteUser = async (userId: string, userIdentifier: string | null) => {
+     if (!confirm(`Are you sure you want to delete user: ${userIdentifier ?? userId}?`)) { return; }
+     setError(null);
      try {
-          const response = await fetch(`/api/users/${userId}`, {
-              method: 'DELETE',
-          });
-
-           const result = await response.json(); // Read body even for errors
-
-          if (!response.ok) {
-               throw new Error(result.message || `Error: ${response.statusText}`);
-          }
-          // Refresh user list on successful deletion
-          await fetchUsers();
-
-     } catch (err: any) {
-          console.error("Delete user error:", err);
-          setError(err.message); // Show error related to deletion
-     }
+          const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+          if (!response.ok && response.status !== 204) {
+                const result = await response.json().catch(() => ({}));
+                throw new Error(result.message || `Error: ${response.statusText}`);
+           }
+          fetchUsers();
+     } catch (err: any) { setError(err.message); }
   };
 
 
-  if (isLoading) return <p>Loading users...</p>;
-  if (error && users.length === 0) return <p>Error loading users: {error}</p>; // Show only loading error if list empty
+  // --- Render Logic ---
+  if (error && users.length === 0 && !isLoading) return <p>Error loading users: {error}</p>;
 
   return (
     <div>
       <h1>User Management</h1>
 
-       {/* Add User Form */}
-       <h2>Add New User</h2>
-       <form onSubmit={handleAddUser}>
-           <div>
-               <label>Username*: <input type="text" value={newUsername} onChange={e => setNewUsername(e.target.value)} required /></label>
-           </div>
-           <div>
-               <label>Password*: <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required /></label>
-           </div>
-           <div>
-               <label>Name: <input type="text" value={newName} onChange={e => setNewName(e.target.value)} /></label>
-           </div>
-           <div>
-               <label>Email: <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} /></label>
-           </div>
-           <div>
-               <label>Role*:
-                   <select value={newRole} onChange={e => setNewRole(e.target.value as UserRole)} required>
+       {/* --- Styled Add User Form Section --- */}
+       <div style={{ border: '1px solid #ccc', padding: '20px', marginBottom: '20px', borderRadius: '5px', backgroundColor: '#f9f9f9' }}>
+           <h2>Add New User</h2>
+           <form onSubmit={handleAddUser}>
+               <div style={{ marginBottom: '12px' }}>
+                   <label htmlFor="add-username" style={labelStyle}>Username*:</label>
+                   <input id="add-username" type="text" value={newUsername} onChange={e => setNewUsername(e.target.value)} required style={inputStyle} />
+               </div>
+               <div style={{ marginBottom: '12px' }}>
+                   <label htmlFor="add-password" style={labelStyle}>Password*:</label>
+                   <input id="add-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required style={inputStyle} />
+               </div>
+               <div style={{ marginBottom: '12px' }}>
+                   <label htmlFor="add-name" style={labelStyle}>Name:</label>
+                   <input id="add-name" type="text" value={newName} onChange={e => setNewName(e.target.value)} style={inputStyle} />
+               </div>
+               <div style={{ marginBottom: '12px' }}>
+                   <label htmlFor="add-email" style={labelStyle}>Email:</label>
+                   <input id="add-email" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} style={inputStyle} />
+               </div>
+               <div style={{ marginBottom: '12px' }}>
+                   <label htmlFor="add-role" style={labelStyle}>Role*:</label>
+                   <select id="add-role" value={newRole} onChange={e => setNewRole(e.target.value as UserRole)} required style={inputStyle}>
                        <option value={UserRole.USER}>User</option>
                        <option value={UserRole.ADMIN}>Admin</option>
                    </select>
-               </label>
-           </div>
-           <button type="submit" disabled={isAdding}>
-               {isAdding ? 'Adding...' : 'Add User'}
-           </button>
-           {addError && <p style={{ color: 'red' }}>{addError}</p>}
-       </form>
+               </div>
+               <button
+                  type="submit"
+                  disabled={isAdding}
+                  style={isAdding ? disabledButtonStyle : buttonStyle} // Apply conditional button style
+               >
+                   {isAdding ? 'Adding...' : 'Add User'}
+               </button>
+               {addError && <p style={{ color: 'red', marginLeft: '85px' }}>{addError}</p>}
+           </form>
+       </div>
 
-      <hr style={{margin: '2rem 0'}} />
-
-      {/* User List */}
+      {/* --- User List --- */}
       <h2>Existing Users</h2>
-      {error && <p style={{ color: 'red' }}>Operation Error: {error}</p>} {/* Show general errors */}
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Username</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Created At</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.id}>
-              <td>{user.id}</td>
-              <td>{user.username ?? 'N/A'}</td>
-              <td>{user.name ?? 'N/A'}</td>
-              <td>{user.email ?? 'N/A'}</td>
-              <td>{user.role}</td>
-              <td>{new Date(user.createdAt).toLocaleString()}</td>
-              <td>
-                <button onClick={() => handleDeleteUser(user.id)}>Delete</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {error && <p style={{ color: 'red' }}>Operation Error: {error}</p>}
+
+      {/* --- Filter Controls --- */}
+      <div style={{ marginBottom: '1rem', display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '10px', border: '1px solid #ccc', borderRadius: '5px' }}>
+          {/* Filter inputs also use inputStyle now */}
+          <input type="text" name="username" placeholder="Filter by Username..." value={filters.username} onChange={handleFilterChange} style={inputStyle} />
+          <input type="text" name="email" placeholder="Filter by Email..." value={filters.email} onChange={handleFilterChange} style={inputStyle} />
+          <select name="role" value={filters.role} onChange={handleFilterChange} style={inputStyle}>
+               <option value="">All Roles</option>
+               <option value={UserRole.USER}>User</option>
+               <option value={UserRole.ADMIN}>Admin</option>
+           </select>
+      </div>
+
+      {/* --- User Table with Increased Spacing --- */}
+      {isLoading ? <p>Loading users...</p> : (
+          <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ccc', background: '#f8f8f8' }}>
+                    <th style={{ padding: '10px 15px', textAlign: 'left' }}>ID</th>
+                    <th style={{ padding: '10px 15px', textAlign: 'left' }}>Username</th>
+                    <th style={{ padding: '10px 15px', textAlign: 'left' }}>Name</th>
+                    <th style={{ padding: '10px 15px', textAlign: 'left' }}>Email</th>
+                    <th style={{ padding: '10px 15px', textAlign: 'left' }}>Role</th>
+                    <th style={{ padding: '10px 15px', textAlign: 'left' }}>Created At</th>
+                    <th style={{ padding: '10px 15px', textAlign: 'left' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.length === 0 ? (
+                      <tr><td colSpan={7} style={{ padding: '10px 15px', textAlign: 'center' }}>No users found matching filters.</td></tr>
+                  ) : (
+                      users.map((user) => (
+                        <tr key={user.id} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '10px 15px' }}>{user.id}</td>
+                          <td style={{ padding: '10px 15px' }}>{user.username ?? 'N/A'}</td>
+                          <td style={{ padding: '10px 15px' }}>{user.name ?? 'N/A'}</td>
+                          <td style={{ padding: '10px 15px' }}>{user.email ?? 'N/A'}</td>
+                          <td style={{ padding: '10px 15px' }}>{user.role}</td>
+                          <td style={{ padding: '10px 15px' }}>{new Date(user.createdAt).toLocaleString()}</td>
+                          <td style={{ padding: '10px 15px' }}>
+                            <button
+                              onClick={() => handleDeleteUser(user.id, user.username ?? user.email ?? null)}
+                              style={{ color: 'red', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                            >
+                                Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+          </div>
+      )}
     </div>
   );
 }
