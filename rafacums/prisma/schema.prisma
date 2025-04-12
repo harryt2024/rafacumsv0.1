@@ -65,3 +65,50 @@ enum UserRole {
   USER
   ADMIN
 }
+
+model UniformItem {
+  id            String      @id @default(cuid())
+  name          String      // e.g., "Wedgewood Shirt", "No 2 SD Jacket", "Beret"
+  type          ItemType    // Use an Enum for categories
+  size          String?     // e.g., "Medium", "10L", "96cm", "58"
+  serialNumber  String?     @unique // Optional, only if items have unique serial numbers
+  condition     Condition   @default(GOOD) // Use an Enum for condition
+  assigneeName  String?     // Name/ID of the cadet or staff it's issued to (simple approach)
+  // assigneeId String?    // Alternatively, link to a User.id if assignees are Users in your system
+  // user        User?       @relation(fields: [assigneeId], references: [id]) // Relation if using assigneeId
+  location      String?     // e.g., "Main Store", "Cadet Smith", "Rack 5"
+  notes         String?     @db.Text // For longer notes
+  addedById     String?     // Optional: ID of the user who added the item
+  // addedBy    User?      @relation("AddedItems", fields: [addedById], references: [id]) // Optional relation
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([type]) // Add indexes to columns you filter/sort by often
+  @@index([condition])
+  @@index([assigneeName])
+}
+
+enum ItemType {
+  SHIRT
+  JACKET
+  TROUSERS
+  BELT
+  BERET
+  HAT_OTHER // Example
+  BOOTS
+  SHOES
+  JUMPER
+  TIE
+  RANK_SLIDE
+  BRASSARD
+  OTHER
+}
+
+enum Condition {
+  NEW
+  GOOD
+  FAIR
+  POOR
+  UNSERVICEABLE
+}
