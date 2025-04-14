@@ -24,3 +24,91 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* app/globals.css */
+
+/* --- Add these styles at the end --- */
+
+@media print {
+  /* Hide elements generally not wanted in print */
+  #sidebar,
+  #app-header,
+  .print-hide {
+    display: none !important; /* Use important to override inline styles if needed */
+  }
+
+  /* Ensure the main content takes up the print page */
+  body {
+    margin: 0;
+    padding: 0;
+    font-size: 10pt; /* Adjust base font size for print */
+    background-color: #fff; /* Ensure white background */
+  }
+
+  #app-container {
+     display: block !important; /* Override flex display for print */
+     height: auto !important;
+  }
+
+  #main-content {
+    padding: 1cm !important; /* Add print margins */
+    margin: 0 !important;
+    width: 100% !important;
+    position: absolute !important; /* Or static if preferred */
+    left: 0 !important;
+    top: 0 !important;
+    overflow-y: visible !important; /* Show all content, don't scroll */
+    border: none !important; /* Remove any borders */
+  }
+
+   /* Styles specific to the uniform page print */
+  #uniform-page-content h1,
+  #uniform-page-content h2 {
+       margin-top: 0;
+       padding-top: 0;
+       page-break-after: avoid; /* Try to keep headers with content */
+   }
+
+  /* Ensure table prints well */
+  #uniform-table-container {
+      overflow-x: visible !important; /* Allow table to expand if needed */
+  }
+
+  table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      page-break-inside: auto; /* Allow table to break across pages if necessary */
+  }
+
+  thead {
+     display: table-header-group; /* Ensure header repeats on each page */
+     background-color: #eee !important; /* Light background for header */
+     -webkit-print-color-adjust: exact; /* Force background color printing */
+     print-color-adjust: exact;
+   }
+
+   tbody tr {
+       page-break-inside: avoid; /* Try to keep rows on one page */
+   }
+
+   th, td {
+      border: 1px solid #ccc !important; /* Add borders for clarity */
+      padding: 6px 10px !important; /* Adjust padding for print */
+      color: #000 !important; /* Ensure black text */
+      background-color: #fff !important; /* Ensure white background */
+   }
+
+   /* Remove link styling for print */
+    a {
+        text-decoration: none !important;
+        color: inherit !important;
+    }
+
+    /* Optional: Show URL for links when printing */
+    /* a[href]:after {
+        content: " (" attr(href) ")";
+        font-size: 90%;
+        color: #555;
+    } */
+
+}

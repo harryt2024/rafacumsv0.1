@@ -11,9 +11,9 @@ export async function POST(req: Request) {
 
   // --- Authorization Check ---
   // Ensure user is logged in and has appropriate role (e.g., ADMIN)
-  if (!session || session.user.role !== UserRole.ADMIN) {
-    return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-  }
+  if (!session || !session.user) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 }); // Use 401 for not logged in
+}
   // --- End Authorization Check ---
 
   try {
