@@ -1,44 +1,48 @@
 // app/layout.tsx
 import React from "react";
-import SessionWrapper from './components/sessionwrapper'; // Assuming path is correct
-import Sidebar from './components/Sidebar';           // Assuming path is correct
-import Header from './components/Header';             // Assuming path is correct
-import './globals.css';                               // Assuming path is correct
+// Make sure these import paths are correct for your project structure
+import SessionWrapper from './components/sessionwrapper';
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
+import './globals.css';
 
-// Your metadata (ensure this is present and correct)
+// Your site metadata
 export const metadata = {
   title: 'RAFAC Uniform System',
   description: 'Uniform Management Dashboard',
 };
 
+// The RootLayout component (should be a Server Component - no 'use client')
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // This should remain a Server Component (no 'use client' at the top)
   return (
     <html lang="en">
       <body>
+        {/* SessionProvider wrapper - likely needed for useSession in child components */}
         <SessionWrapper>
-          {/* Main container for Flexbox layout, added ID for potential print styling */}
+          {/* Main container using Flexbox for Sidebar + Main Area layout */}
+          {/* Added id="app-container" for potential print styling */}
           <div id="app-container" style={{ display: 'flex', height: '100vh' }}>
 
-            {/* Sidebar: Add id="sidebar" */}
-            {/* Make sure your Sidebar component applies this id to its root element, */}
-            {/* or wrap it like: <div id="sidebar"><Sidebar /></div> */}
-            <Sidebar id="sidebar" />
+            {/* Wrapper div for Sidebar with ID for CSS print targeting */}
+            <div id="sidebar">
+              <Sidebar />
+            </div>
 
-            {/* Container for Header and Main Content */}
-            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}> {/* Added overflow: hidden */}
+            {/* Container for Header and Main Page Content */}
+            <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}> {/* Prevents potential double scrollbars */}
 
-              {/* Header: Add id="app-header" */}
-              {/* Make sure your Header component applies this id to its root element, */}
-              {/* or wrap it like: <div id="app-header"><Header /></div> */}
-              <Header id="app-header" />
+              {/* Wrapper div for Header with ID for CSS print targeting */}
+              <div id="app-header">
+                <Header />
+              </div>
 
-              {/* Main Content Area: Add id="main-content" */}
-              <main id="main-content" style={{ flexGrow: 1, padding: '20px', overflowY: 'auto' }}> {/* Ensure scrolling is possible */}
+              {/* Main content area where page children will be rendered */}
+              {/* Added id="main-content" for potential print styling */}
+              <main id="main-content" style={{ flexGrow: 1, padding: '20px', overflowY: 'auto' }}> {/* Allows content to scroll */}
                 {children}
               </main>
 
