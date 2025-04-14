@@ -5,71 +5,38 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import { prisma } from '@/lib/prisma';
 import { UserRole } from '@prisma/client';
-import bcrypt from 'bcrypt'; // Import bcrypt if needed for other methods later
-import { Prisma } from '@prisma/client'; // Import Prisma namespace
+import bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 
-// Define the expected structure for params *inside* the context
-interface RouteParams {
-    userId: string;
-}
-
-// Define the expected structure of the context object itself
-interface RouteContext {
-    params: RouteParams;
-}
-
-// DELETE handler using 'unknown' for context and type assertion inside
+/**
+ * Handles Deleting a specific user by ID (Admin only).
+ * Uses 'context: any' as workaround.
+ */
 export async function DELETE(
     req: NextRequest,
-    context: unknown // <-- Type as unknown initially
+    context: any // <-- Applying 'any' workaround
 ) {
-    // --- Type Assertion ---
-    // Assert that context matches the expected structure
-    // Add checks to ensure properties exist before accessing
-    const params = (context as RouteContext)?.params;
-    const userId = params?.userId;
-    console.log("--- DELETE /api/users/[userId] ---");
-    console.log("Received Context (as unknown then asserted):", JSON.stringify(context, null, 2));
-    console.log("Extracted userId via assertion:", userId);
-    // --- End Type Assertion ---
+    const session = await getServerSession(authOptions);
+    // Safe access needed due to 'any'
+    const userId = context?.params?.userId as string | undefined;
 
-
-    let session;
-    try {
-        console.log("Attempting getServerSession...");
-        session = await getServerSession(authOptions);
-        console.log("getServerSession call completed. Session found:", !!session);
-    } catch (error) {
-        console.error("CRITICAL ERROR during getServerSession:", error);
-        return NextResponse.json({ message: 'Failed to check session' }, { status: 500 });
-    }
-
-    // --- Authorization Check ---
-    if (!session || !session.user || session.user.role !== UserRole.ADMIN) { // Safe access needed for session.user
-        console.log("Authorization failed.");
+    // Authorization Check
+    if (!session || !session.user || session.user.role !== UserRole.ADMIN) {
         return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
-
-    // --- Prevent Self-Deletion ---
-    if (session.user.id === userId) { // userId could be undefined here from assertion
-        console.log("Self-deletion attempt blocked or userId missing after assertion.");
-        return NextResponse.json({ message: 'Cannot delete yourself or invalid User ID' }, { status: 400 });
+    // Prevent Self-Deletion
+    if (!session.user || session.user.id === userId) {
+        return NextResponse.json({ message: 'Cannot delete yourself or invalid session' }, { status: 400 });
     }
-
-    // Check if userId is valid *after* assertion
+    // ID Check
     if (!userId || typeof userId !== 'string') {
-        console.error("userId check failed after assertion! Value was:", userId);
+        console.error("Delete userId check failed! Value was:", userId);
         return NextResponse.json({ message: 'User ID not provided or invalid' }, { status: 400 });
     }
 
     try {
-        console.log(`Attempting prisma.user.delete for ID: ${userId}`);
-        await prisma.user.delete({
-            where: { id: userId }, // Now userId is confirmed string
-        });
-        console.log(`Successfully deleted user ${userId}`);
+        await prisma.user.delete({ where: { id: userId } });
         return new Response(null, { status: 204 });
-
     } catch (error: any) {
         console.error(`Failed to delete user ${userId}:`, error);
         if (error.code === 'P2025') {
@@ -79,5 +46,70 @@ export async function DELETE(
     }
 }
 
-// Add other handlers (PATCH, GET etc.) using the same pattern if needed:
-// export async function PATCH(req: NextRequest, context: unknown) { ... assert context as RouteContext ... }
+/**
+ * Handles Partially Updating (PATCH) a specific user by ID (Admin only).
+ * Uses 'context: any' as workaround.
+ */
+export async function PATCH(
+    req: NextRequest,
+    context: any // <-- Applying 'any' workaround
+) {
+    const session = await getServerSession(authOptions);
+     // Safe access needed due to 'any'
+    const userId = context?.params?.userId as string | undefined;
+
+    // Authorization: Only Admins can edit users
+    if (!session || !session.user || session.user.role !== UserRole.ADMIN) {
+        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+    // ID Check
+    if (!userId || typeof userId !== 'string') {
+         console.error("Patch userId check failed! Value was:", userId);
+        return NextResponse.json({ message: 'User ID not provided or invalid' }, { status: 400 });
+    }
+
+    try {
+        const body = await req.json();
+        const { name, username, email, password, role } = body;
+
+        // Prevent Admin self-role change
+        if (session.user.id === userId && role && role !== UserRole.ADMIN) {
+             return NextResponse.json({ message: 'Admins cannot change their own role.' }, { status: 400 });
+        }
+
+        const updateData: Prisma.UserUpdateInput = {};
+        // Build updateData object checking if fields are defined...
+        if (name !== undefined) updateData.name = name;
+        if (email !== undefined) updateData.email = email;
+        if (username) { /* ... check uniqueness ... */
+             const existingUser = await prisma.user.findFirst({ where: { username: username, NOT: { id: userId } }});
+             if (existingUser) { return NextResponse.json({ message: 'Username already taken' }, { status: 409 }); }
+             updateData.username = username;
+         }
+        if (password && typeof password === 'string') { /* ... check length, hash password ... */
+             if (password.length < 6) { return NextResponse.json({ message: 'Password too short' }, { status: 400 }); }
+             updateData.hashedPassword = await bcrypt.hash(password, 10);
+         }
+        if (role) { /* ... validate role ... */
+             if (!Object.values(UserRole).includes(role as UserRole)) { return NextResponse.json({ message: 'Invalid role' }, { status: 400 }); }
+             if (session.user.id === userId && role !== UserRole.ADMIN) { return NextResponse.json({ message: 'Cannot self-demote' }, { status: 400 }); }
+             updateData.role = role as UserRole;
+         }
+
+        if (Object.keys(updateData).length === 0) {
+             return NextResponse.json({ message: 'No update data provided' }, { status: 400 });
+        }
+
+        const updatedUser = await prisma.user.update({ /* ... prisma update call ... */
+            where: { id: userId }, data: updateData,
+            select: { id: true, name: true, username: true, email: true, role: true, createdAt: true, updatedAt: true, image: true, emailVerified: true }
+         });
+        return NextResponse.json(updatedUser);
+
+    } catch (error: any) { /* ... error handling ... */
+        console.error(`Failed to update user ${userId}:`, error);
+        if (error.code === 'P2025') { return NextResponse.json({ message: 'User not found' }, { status: 404 }); }
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') { const field = (error.meta?.target as string[])?.join(', ') || 'field'; return NextResponse.json({ message: `Update failed: ${field} must be unique.` }, { status: 409 }); }
+        return NextResponse.json({ message: 'Failed to update user' }, { status: 500 });
+    }
+}
